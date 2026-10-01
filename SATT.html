@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School & Holiday Planner Pro</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #eef2f3 0%, #8e9eab 100%);
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --primary: #2563eb;
+            --primary-light: #dbeafe;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --poya-color: #d97706;
+            --holiday-color: #dc2626;
+            --absent-color: #7c3aed;
+            --accent: #059669;
+            --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+            --modal-bg: #ffffff;
+            --day-bg: rgba(255, 255, 255, 0.8);
+        }
+
+        body.dark-mode {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            --card-bg: rgba(30, 41, 59, 0.85);
+            --primary: #3b82f6;
+            --primary-light: #1e3a8a;
+            --text-dark: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            --modal-bg: #1e293b;
+            --day-bg: rgba(51, 65, 85, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            transition: background 0.3s, color 0.3s, border-color 0.3s;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .top-bar {
+            width: 100%;
+            max-width: 960px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .top-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            color: var(--text-dark);
+            padding: 8px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 960px;
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            padding: 28px;
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+            overflow: hidden;
+        }
+
+        @media (max-width: 768px) {
+            .app-container { grid-template-columns: 1fr; }
+        }
+
+        /* Large Dynamic Water Gauge Inside Summary Card */
+        .summary-header-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+            gap: 12px;
+        }
+
+        .summary-header-wrap > div:first-child {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .water-circle-large {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: var(--day-bg);
+            border: 4px solid var(--primary);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 8px 0;
+        }
+
+        .water-wave-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            background: var(--primary);
+            transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0.85;
+        }
+
+        /* Realistic Dual Wave Effect */
+        .water-wave-container::before,
+        .water-wave-container::after {
+            content: "";
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            top: -210px;
+            left: 50%;
+            transform: translate(-50%, 0);
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 42%;
+            animation: wave 5s infinite linear;
+        }
+
+        .water-wave-container::after {
+            border-radius: 38%;
+            background: rgba(255, 255, 255, 0.25);
+            animation: wave 9s infinite linear;
+        }
+
+        @keyframes wave {
+            0% { transform: translate(-50%, 0) rotate(0deg); }
+            100% { transform: translate(-50%, 0) rotate(360deg); }
+        }
+
+        .water-text-large {
+            position: relative;
+            z-index: 2;
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text-dark);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Notes Display List inside Summary */
+        .notes-summary-box {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border);
+        }
+
+        .notes-summary-box h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .notes-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 140px;
+            overflow-y: auto;
+        }
+
+        .notes-list-item {
+            font-size: 11px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            background: var(--day-bg);
+            border: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .notes-list-item .note-date {
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* Calendar Header & Quick Nav */
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .header-selects {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .header-selects select {
+            background: var(--day-bg);
+            color: var(--text-dark);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 6px 10px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .nav-btn {
+            background: var(--day-bg);
+            color: var(--text-dark);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+        }
+
+        /* Calendar Grid & Animated Transitions */
+        .calendar-body {
+            overflow: hidden;
+            position: relative;
+        }
+
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            font-weight: 700;
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .days-grid.slide-out {
+            opacity: 0;
+            transform: scale(0.96);
+        }
+
+        .day-card {
+            background: var(--day-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            min-height: 75px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            user-select: none;
+            position: relative;
+        }
+
+        .day-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08);
+            border-color: var(--primary);
+        }
+
+        .day-card:active {
+            transform: scale(0.95);
+        }
+
+        .day-card.other-month {
+            opacity: 0.25;
+            cursor: default;
+            pointer-events: none;
+        }
+
+        .day-number {
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        .today {
+            box-shadow: inset 0 0 0 2px var(--primary);
+        }
+
+        /* Dynamic Day Status Colors */
+        .day-card.status-poya {
+            background: rgba(217, 119, 6, 0.15);
+            border-color: var(--poya-color);
+        }
+
+        .day-card.status-holiday {
+            background: rgba(220, 38, 38, 0.15);
+            border-color: var(--holiday-color);
+        }
+
+        .day-card.status-absent {
+            background: rgba(124, 58, 237, 0.15);
+            border-color: var(--absent-color);
+        }
+
+        /* Tags */
+        .tag-container {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            margin-top: 4px;
+        }
+
+        .tag {
+            font-size: 10px;
+            padding: 3px 6px;
+            border-radius: 6px;
+            color: white;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tag-poya { background: var(--poya-color); }
+        .tag-holiday { background: var(--holiday-color); }
+        .tag-absent { background: var(--absent-color); }
+
+        /* Sidebar Stats */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .stats-card {
+            background: var(--day-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: var(--shadow);
+        }
+
+        .stats-card h3 {
+            margin: 0;
+            font-size: 15px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .sync-status {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            background: var(--border);
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .sync-online { background: #dcfce7; color: #15803d; }
+
+        /* Popout Notification Toast */
+        .notification-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--modal-bg);
+            border: 1px solid var(--border);
+            padding: 14px 20px;
+            border-radius: 14px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 2000;
+            transform: translateY(120%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .notification-toast.show {
+            transform: translateY(0);
+        }
+
+        .toast-icon { font-size: 22px; }
+        .toast-text { font-size: 13px; font-weight: 600; }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(8px);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: var(--modal-bg);
+            color: var(--text-dark);
+            padding: 24px;
+            border-radius: 18px;
+            width: 320px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            transform: translateY(20px);
+            transition: transform 0.25s ease;
+            border: 1px solid var(--border);
+        }
+
+        .modal.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-content select, .modal-content input {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0 16px 0;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--day-bg);
+            color: var(--text-dark);
+            outline: none;
+        }
+
+        .btn-group { display: flex; gap: 8px; justify-content: flex-end; }
+        .btn { padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+        .btn-save { background: var(--primary); color: white; }
+        .btn-cancel { background: var(--border); color: var(--text-dark); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <button class="top-btn" onclick="toggleLanguage()"><span id="langLabel">English</span> 🌐</button>
+    <button class="top-btn" onclick="toggleTheme()"><span id="themeLabel">Dark Mode</span> 🌙</button>
+</div>
+
+<div class="app-container">
+    <div class="calendar-body">
+        <div class="calendar-header">
+            <button class="nav-btn" onclick="changeMonth(-1)" id="prevBtn">&lt; පෙර මාසය</button>
+            
+            <!-- Quick Navigation Selects -->
+            <div class="header-selects">
+                <select id="monthSelect" onchange="jumpToDate()"></select>
+                <select id="yearSelect" onchange="jumpToDate()"></select>
+            </div>
+
+            <button class="nav-btn" onclick="changeMonth(1)" id="nextBtn">ඊළඟ මාසය &gt;</button>
+        </div>
+
+        <div class="weekdays" id="weekdaysHeader"></div>
+        <div class="days-grid" id="daysGrid"></div>
+    </div>
+
+    <!-- Sidebar Stats -->
+    <div class="sidebar">
+        <div class="stats-card">
+            <div class="summary-header-wrap">
+                <div>
+                    <h3 id="summaryTitle">📊 මාසික සාරාංශය</h3>
+                    <span id="syncIndicator" class="sync-status">Offline</span>
+                </div>
+                <!-- Prominent Large Water Gauge -->
+                <div class="water-circle-large">
+                    <div class="water-wave-container" id="waterWave"></div>
+                    <div class="water-text-large" id="waterText">0%</div>
+                </div>
+            </div>
+
+            <div class="stat-item"><span id="lblSchoolDays">මුළු පාසල් දින:</span> <b id="statSchoolDays">0</b></div>
+            <div class="stat-item"><span id="lblAbsentDays">නොපැමිණි දින:</span> <b id="statAbsentDays" style="color: var(--absent-color)">0</b></div>
+            <div class="stat-item"><span id="lblHolidays">රජයේ නිවාඩු/පෝය:</span> <b id="statHolidays" style="color: var(--poya-color)">0</b></div>
+            <div class="stat-item"><span id="lblAttendedDays">පැමිණි දින:</span> <b id="statAttended" style="color: var(--accent)">0</b></div>
+
+            <!-- Notes Section Inside Monthly Summary -->
+            <div class="notes-summary-box">
+                <h4 id="lblNotesTitle">📝 මාසික සටහන්/හේතු</h4>
+                <ul class="notes-list" id="notesList">
+                    <!-- Dynamic Notes Populate Here -->
+                </ul>
+            </div>
+        </div>
+
+        <div class="stats-card">
+            <h3 id="syncConfigTitle">📌 Sync Configuration</h3>
+            <p style="font-size: 11px; color: var(--text-muted); margin: 6px 0 10px 0;" id="syncDesc">
+                වෙනත් Device එකක දත්ත පෙන්වීමට එම Device එකෙහිත් එකම **Device Group Key** එක ලබා දෙන්න.
+            </p>
+            <input type="text" id="userSyncKey" placeholder="Sync Key" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); font-size:12px; background: var(--day-bg); color: var(--text-dark);" onchange="updateSyncKey(this.value)">
+        </div>
+
+        <!-- Year Range Configuration Card -->
+        <div class="stats-card">
+            <h3 id="yearConfigTitle">📅 වසර පරාසය (Year Range)</h3>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <input type="number" id="startYearInput" value="2020" style="width:50%; padding:6px; border-radius:8px; border:1px solid var(--border); background:var(--day-bg); color:var(--text-dark);" onchange="updateYearRange()">
+                <input type="number" id="endYearInput" value="2040" style="width:50%; padding:6px; border-radius:8px; border:1px solid var(--border); background:var(--day-bg); color:var(--text-dark);" onchange="updateYearRange()">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Event Modal (Triggered via Long Press) -->
+<div class="modal" id="eventModal">
+    <div class="modal-content">
+        <h4 id="modalDateTitle" style="margin: 0 0 10px 0;">දිනය තෝරන්න</h4>
+        <label style="font-size:12px; font-weight:600;" id="lblType">වර්ගය (Type):</label>
+        <select id="eventType">
+            <option value="none" id="optNone">සාමාන්‍‍ය දිනය (None)</option>
+            <option value="absent" id="optAbsent">නොපැමිණි දිනය (Absent)</option>
+            <option value="poya" id="optPoya">පෝය දිනය (Poya Day)</option>
+            <option value="holiday" id="optHoliday">වෙනත් නිවාඩුවක් (Holiday)</option>
+        </select>
+
+        <label style="font-size:12px; font-weight:600;" id="lblNote">විස්තරය (Note):</label>
+        <input type="text" id="eventNote" placeholder="උදා: අසනීප විය">
+
+        <div class="btn-group">
+            <button class="btn btn-cancel" onclick="closeModal()" id="btnCancel">අවලංගුයි</button>
+            <button class="btn btn-save" onclick="saveEvent()" id="btnSave">සුරකින්න</button>
+        </div>
+    </div>
+</div>
+
+<!-- Popout Notification Toast -->
+<div class="notification-toast" id="notifToast">
+    <span class="toast-icon" id="toastIcon">⚠️</span>
+    <span class="toast-text" id="toastText">මාසික පැමිණීම සටහන් විය!</span>
+</div>
+
+<script>
+    // --- Language Translations ---
+    let currentLang = localStorage.getItem('planner_lang') || 'si';
+
+    const i18n = {
+        si: {
+            months: ["ජනවාරි", "පෙබරවාරි", "මාර්තු", "අප්‍රේල්", "මැයි", "ජූනි", "ජූලි", "අගෝස්තු", "සැප්තැම්බර්", "ඔක්තෝබර්", "නොවැම්බර්", "දෙසැම්බර්"],
+            weekdays: ["ඉරිදා", "සඳුදා", "අඟහ", "බදාදා", "බ්‍රහස්", "සිකු", "සෙන"],
+            prevBtn: "< පෙර මාසය",
+            nextBtn: "ඊළඟ මාසය >",
+            summaryTitle: "📊 මාසික සාරාංශය",
+            lblSchoolDays: "මුළු පාසල් දින:",
+            lblAbsentDays: "නොපැමිණි දින:",
+            lblHolidays: "රජයේ නිවාඩු/පෝය:",
+            lblAttendedDays: "පැමිණි දින:",
+            lblNotesTitle: "📝 මාසික සටහන්/හේතු",
+            noNotesText: "මෙම මාසය සඳහා සටහන් නොමැත.",
+            syncConfigTitle: "📌 Sync Configuration",
+            syncDesc: "වෙනත් Device එකක දත්ත පෙන්වීමට එම Device එකෙහිත් එකම Device Group Key එක ලබා දෙන්න.",
+            yearConfigTitle: "📅 වසර පරාසය (Year Range)",
+            lblType: "වර්ගය (Type):",
+            lblNote: "විස්තරය (Note):",
+            optNone: "සාමාන්‍ය දිනය (None)",
+            optAbsent: "නොපැමිණි දිනය (Absent)",
+            optPoya: "පෝය දිනය (Poya Day)",
+            optHoliday: "වෙනත් නිවාඩුවක් (Holiday)",
+            btnCancel: "අවලංගුයි",
+            btnSave: "සුරකින්න",
+            notePlaceholder: "උදා: අසනීප විය",
+            tagPoya: "පෝය",
+            tagHoliday: "නිවාඩු",
+            tagAbsent: "Absent",
+            langLabel: "English",
+            themeDark: "Dark Mode 🌙",
+            themeLight: "Light Mode ☀️",
+            warnAttendance: "අවධානයයි! මෙම මාසයේ පැමිණීම 75% ට වඩා අඩුයි!",
+            goodAttendance: "නියමයි! පැමිණීමේ ප්‍රතිශතය යහපත් මට්ටමක පවතී."
+        },
+        en: {
+            months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+            weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+            prevBtn: "< Prev Month",
+            nextBtn: "Next Month >",
+            summaryTitle: "📊 Monthly Summary",
+            lblSchoolDays: "Total School Days:",
+            lblAbsentDays: "Absent Days:",
+            lblHolidays: "Public Holidays/Poya:",
+            lblAttendedDays: "Attended Days:",
+            lblNotesTitle: "📝 Monthly Notes",
+            noNotesText: "No notes recorded for this month.",
+            syncConfigTitle: "📌 Sync Configuration",
+            syncDesc: "Enter the same Device Group Key on other devices to sync calendar data live.",
+            yearConfigTitle: "📅 Year Range",
+            lblType: "Type:",
+            lblNote: "Note:",
+            optNone: "Normal Day (None)",
+            optAbsent: "Absent Day",
+            optPoya: "Poya Day",
+            optHoliday: "Other Holiday",
+            btnCancel: "Cancel",
+            btnSave: "Save",
+            notePlaceholder: "e.g. Sick Leave",
+            tagPoya: "Poya",
+            tagHoliday: "Holiday",
+            tagAbsent: "Absent",
+            langLabel: "සිංහල",
+            themeDark: "Dark Mode 🌙",
+            themeLight: "Light Mode ☀️",
+            warnAttendance: "Warning! Attendance is below 75% this month!",
+            goodAttendance: "Great job! Attendance rate is in good standing."
+        }
+    };
+
+    // --- Firebase Live Sync ---
+    const firebaseConfig = {
+        databaseURL: "https://school-planner-sync-default-rtdb.firebaseio.com/"
+    };
+    
+    let dbRef = null;
+    let syncKey = localStorage.getItem('planner_sync_key') || 'default-user-room';
+    document.getElementById('userSyncKey').value = syncKey;
+
+    try {
+        firebase.initializeApp(firebaseConfig);
+        dbRef = firebase.database().ref('planners/' + syncKey);
+        document.getElementById('syncIndicator').classList.add('sync-online');
+        document.getElementById('syncIndicator').innerText = 'Live Sync';
+        
+        dbRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                eventsData = data;
+                localStorage.setItem('calendar_events', JSON.stringify(eventsData));
+                renderCalendar();
+            }
+        });
+    } catch (e) {
+        console.log("Firebase initialized in local-fallback mode.");
+    }
+
+    let currentDate = new Date();
+    let selectedDateStr = "";
+    let eventsData = JSON.parse(localStorage.getItem('calendar_events')) || {};
+
+    let startYear = parseInt(localStorage.getItem('planner_start_year')) || 2020;
+    let endYear = parseInt(localStorage.getItem('planner_end_year')) || 2040;
+    document.getElementById('startYearInput').value = startYear;
+    document.getElementById('endYearInput').value = endYear;
+
+    // --- Theme & Language Setup ---
+    let isDarkMode = localStorage.getItem('planner_theme') === 'dark';
+    if (isDarkMode) document.body.classList.add('dark-mode');
+
+    function toggleTheme() {
+        isDarkMode = !isDarkMode;
+        document.body.classList.toggle('dark-mode', isDarkMode);
+        localStorage.setItem('planner_theme', isDarkMode ? 'dark' : 'light');
+        updateStaticLabels();
+    }
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'si' ? 'en' : 'si';
+        localStorage.setItem('planner_lang', currentLang);
+        updateStaticLabels();
+        renderCalendar();
+    }
+
+    function updateStaticLabels() {
+        const lang = i18n[currentLang];
+        document.getElementById('langLabel').innerText = lang.langLabel;
+        document.getElementById('themeLabel').innerText = isDarkMode ? lang.themeLight : lang.themeDark;
+        document.getElementById('prevBtn').innerText = lang.prevBtn;
+        document.getElementById('nextBtn').innerText = lang.nextBtn;
+        document.getElementById('summaryTitle').innerText = lang.summaryTitle;
+        document.getElementById('lblSchoolDays').innerText = lang.lblSchoolDays;
+        document.getElementById('lblAbsentDays').innerText = lang.lblAbsentDays;
+        document.getElementById('lblHolidays').innerText = lang.lblHolidays;
+        document.getElementById('lblAttendedDays').innerText = lang.lblAttendedDays;
+        document.getElementById('lblNotesTitle').innerText = lang.lblNotesTitle;
+        document.getElementById('syncConfigTitle').innerText = lang.syncConfigTitle;
+        document.getElementById('syncDesc').innerText = lang.syncDesc;
+        document.getElementById('yearConfigTitle').innerText = lang.yearConfigTitle;
+        document.getElementById('lblType').innerText = lang.lblType;
+        document.getElementById('lblNote').innerText = lang.lblNote;
+        document.getElementById('optNone').innerText = lang.optNone;
+        document.getElementById('optAbsent').innerText = lang.optAbsent;
+        document.getElementById('optPoya').innerText = lang.optPoya;
+        document.getElementById('optHoliday').innerText = lang.optHoliday;
+        document.getElementById('btnCancel').innerText = lang.btnCancel;
+        document.getElementById('btnSave').innerText = lang.btnSave;
+        document.getElementById('eventNote').placeholder = lang.notePlaceholder;
+
+        // Render Weekdays
+        const weekdaysGrid = document.getElementById('weekdaysHeader');
+        weekdaysGrid.innerHTML = lang.weekdays.map(d => `<div>${d}</div>`).join('');
+    }
+
+    function populateMonthYearDropdowns() {
+        const monthSelect = document.getElementById('monthSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        const lang = i18n[currentLang];
+
+        monthSelect.innerHTML = lang.months.map((m, idx) => `<option value="${idx}">${m}</option>`).join('');
+
+        let yearOptions = "";
+        for (let y = startYear; y <= endYear; y++) {
+            yearOptions += `<option value="${y}">${y}</option>`;
+        }
+        yearSelect.innerHTML = yearOptions;
+    }
+
+    function updateYearRange() {
+        startYear = parseInt(document.getElementById('startYearInput').value) || 2020;
+        endYear = parseInt(document.getElementById('endYearInput').value) || 2040;
+        localStorage.setItem('planner_start_year', startYear);
+        localStorage.setItem('planner_end_year', endYear);
+        populateMonthYearDropdowns();
+        renderCalendar();
+    }
+
+    function updateSyncKey(newKey) {
+        if (!newKey.trim()) return;
+        localStorage.setItem('planner_sync_key', newKey.trim());
+        location.reload();
+    }
+
+    function changeMonth(delta) {
+        const grid = document.getElementById('daysGrid');
+        grid.classList.add('slide-out');
+        setTimeout(() => {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            renderCalendar();
+            grid.classList.remove('slide-out');
+        }, 200);
+    }
+
+    function jumpToDate() {
+        const selectedMonth = parseInt(document.getElementById('monthSelect').value);
+        const selectedYear = parseInt(document.getElementById('yearSelect').value);
+        currentDate.setFullYear(selectedYear);
+        currentDate.setMonth(selectedMonth);
+        renderCalendar();
+    }
+
+    function showNotification(msg, icon = 'ℹ️') {
+        const toast = document.getElementById('notifToast');
+        document.getElementById('toastText').innerText = msg;
+        document.getElementById('toastIcon').innerText = icon;
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 4000);
+    }
+
+    // Direct Cycle-Status on Single Click / Touch
+    function cycleDayStatus(dateStr) {
+        const statusOrder = ['none', 'absent', 'poya', 'holiday'];
+        let currentStatus = 'none';
+        let currentNote = '';
+
+        if (eventsData[dateStr]) {
+            currentStatus = eventsData[dateStr].type;
+            currentNote = eventsData[dateStr].note || '';
+        }
+
+        let nextIndex = (statusOrder.indexOf(currentStatus) + 1) % statusOrder.length;
+        let nextStatus = statusOrder[nextIndex];
+
+        if (nextStatus === 'none') {
+            delete eventsData[dateStr];
+        } else {
+            eventsData[dateStr] = { type: nextStatus, note: currentNote };
+        }
+
+        saveToStorage();
+        renderCalendar();
+    }
+
+    function saveToStorage() {
+        localStorage.setItem('calendar_events', JSON.stringify(eventsData));
+        if (dbRef) dbRef.set(eventsData);
+    }
+
+    function renderCalendar() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const lang = i18n[currentLang];
+
+        document.getElementById('monthSelect').value = month;
+        document.getElementById('yearSelect').value = year;
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDate = new Date(year, month + 1, 0).getDate();
+        const prevMonthLastDate = new Date(year, month, 0).getDate();
+
+        const daysGrid = document.getElementById('daysGrid');
+        daysGrid.innerHTML = "";
+
+        // Previous Month Padding
+        for (let i = firstDay; i > 0; i--) {
+            const div = document.createElement('div');
+            div.className = "day-card other-month";
+            div.innerHTML = `<span class="day-number">${prevMonthLastDate - i + 1}</span>`;
+            daysGrid.appendChild(div);
+        }
+
+        let totalSchoolWeekdays = 0;
+        let monthAbsents = 0;
+        let monthHolidays = 0;
+        let activeMonthNotes = [];
+
+        // Current Month Days
+        for (let day = 1; day <= lastDate; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dayOfWeek = new Date(year, month, day).getDay();
+            const isWeekday = (dayOfWeek !== 0 && dayOfWeek !== 6);
+
+            const div = document.createElement('div');
+            div.className = "day-card";
+
+            const today = new Date();
+            if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                div.classList.add('today');
+            }
+
+            let html = `<span class="day-number">${day}</span><div class="tag-container">`;
+
+            if (eventsData[dateStr]) {
+                const ev = eventsData[dateStr];
+                div.classList.add(`status-${ev.type}`);
+
+                if (ev.type === 'poya') {
+                    html += `<div class="tag tag-poya">${lang.tagPoya}</div>`;
+                    monthHolidays++;
+                } else if (ev.type === 'holiday') {
+                    html += `<div class="tag tag-holiday">${ev.note || lang.tagHoliday}</div>`;
+                    monthHolidays++;
+                } else if (ev.type === 'absent') {
+                    html += `<div class="tag tag-absent">${lang.tagAbsent}</div>`;
+                    if (isWeekday) monthAbsents++;
+                }
+
+                if (ev.note && ev.note.trim() !== '') {
+                    activeMonthNotes.push({ date: day, note: ev.note, type: ev.type });
+                }
+            }
+
+            if (isWeekday && (!eventsData[dateStr] || (eventsData[dateStr].type !== 'poya' && eventsData[dateStr].type !== 'holiday'))) {
+                totalSchoolWeekdays++;
+            }
+
+            html += `</div>`;
+            div.innerHTML = html;
+
+            // --- Touch & Long Press Interaction logic ---
+            let pressTimer = null;
+            let isLongPress = false;
+
+            const startPress = () => {
+                isLongPress = false;
+                pressTimer = setTimeout(() => {
+                    isLongPress = true;
+                    openModal(dateStr);
+                }, 500); // 500ms for long press
+            };
+
+            const cancelPress = () => {
+                clearTimeout(pressTimer);
+            };
+
+            div.onmousedown = startPress;
+            div.onmouseup = (e) => {
+                cancelPress();
+                if (!isLongPress) cycleDayStatus(dateStr);
+            };
+            div.ontouchstart = startPress;
+            div.ontouchend = (e) => {
+                cancelPress();
+                if (!isLongPress) {
+                    e.preventDefault();
+                    cycleDayStatus(dateStr);
+                }
+            };
+
+            daysGrid.appendChild(div);
+        }
+
+        // Stats Calculation & Water Gauge Update
+        const attended = Math.max(0, totalSchoolWeekdays - monthAbsents);
+        const rate = totalSchoolWeekdays > 0 ? Math.round((attended / totalSchoolWeekdays) * 100) : 0;
+
+        document.getElementById('statSchoolDays').innerText = totalSchoolWeekdays;
+        document.getElementById('statAbsentDays').innerText = monthAbsents;
+        document.getElementById('statHolidays').innerText = monthHolidays;
+        document.getElementById('statAttended').innerText = attended;
+
+        // Update Water Wave Gauge
+        const waterWave = document.getElementById('waterWave');
+        const waterText = document.getElementById('waterText');
+        waterWave.style.height = `${rate}%`;
+        waterText.innerText = `${rate}%`;
+        
+        if (rate < 75) {
+            waterWave.style.background = 'var(--holiday-color)';
+            if (totalSchoolWeekdays > 0 && monthAbsents > 0) {
+                showNotification(lang.warnAttendance, '⚠');
+            }
+        } else {
+            waterWave.style.background = 'var(--accent)';
+        }
+
+        // Render Monthly Notes
+        const notesList = document.getElementById('notesList');
+        if (activeMonthNotes.length === 0) {
+            notesList.innerHTML = `<li style="font-size:11px; color:var(--text-muted);">${lang.noNotesText}</li>`;
+        } else {
+            notesList.innerHTML = activeMonthNotes.map(n => `
+                <li class="notes-list-item">
+                    <span><b class="note-date">${n.date} දිනය:</b> ${n.note}</span>
+                </li>
+            `).join('');
+        }
+    }
+
+    function openModal(dateStr) {
+        selectedDateStr = dateStr;
+        document.getElementById('modalDateTitle').innerText = `${dateStr}`;
+        if (eventsData[dateStr]) {
+            document.getElementById('eventType').value = eventsData[dateStr].type;
+            document.getElementById('eventNote').value = eventsData[dateStr].note || '';
+        } else {
+            document.getElementById('eventType').value = 'none';
+            document.getElementById('eventNote').value = '';
+        }
+        document.getElementById('eventModal').classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('eventModal').classList.remove('active');
+    }
+
+    function saveEvent() {
+        const type = document.getElementById('eventType').value;
+        const note = document.getElementById('eventNote').value;
+
+        if (type === 'none') {
+            delete eventsData[selectedDateStr];
+        } else {
+            eventsData[selectedDateStr] = { type, note };
+        }
+
+        saveToStorage();
+        closeModal();
+        renderCalendar();
+    }
+
+    // Init App
+    updateStaticLabels();
+    populateMonthYearDropdowns();
+    renderCalendar();
+</script>
+</body>
+</html>
